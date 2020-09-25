@@ -6,30 +6,31 @@ namespace App\Autoloader;
  *  An Autoloder-Class intended to be used as a default implementation for __autoload().
  * 
  *  Highly inspired from the PSR-4 autoloader: https://www.php-fig.org/psr/psr-4 and the sample code: https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-4-autoloader-examples.md.
- *  The Class is searching inside given Strukture and give back a `require_once('base/directory/of/that/File.php')`.
+ *  The Class is searching inside given structure and give back a `require_once('base/directory/of/that/File.php')`.
  * 
  *  ## Integrate this autoloader with: 
  * |    $Loading = new App\Autoloader\Autoloader;
  * 
- *  ## Add the Strukture of that App:
- * |    $Loading->setStruktur(relative/path/to/folder);
- * |    $Loading->setStruktur(relative/path/to/another/folder);
+ *  ## Add the structure of that App:
+ * |    $Loading->setStruktur('core');
+ * |    $Loading->setStruktur('app/controllers');
  * 
  *  ## Add the Root Directory of that App
  * |    $Loading->setRoot(dirname(__FILE__));
  * 
  * ## Set the Classes
- * |    $Loading->setClass('Namespace\YourBootstrap');
- * |    $Loading->setClass('Sublevel\Namespace\YourController');
- * |    $Loading->setClass('Another\Sublevel\Namespace\YourModel');
+ * |    $Loading->setClass('core\Bootstrap', 'Bootstrap');
+ * |    $Loading->setClass('core\Controller', 'Controller');
+ * |    $Loading->setClass('app\controllers\User', 'User');
  * 
  * ## Register 
  * |    $Loading->register()
  * 
  * ## Call the Classes in your Awasome Code
- * |    $YourBootstrap = new Namespace\YourBootstrap;
- * |    $YourController = new Sublevel\Namespace\YourController;
- * |    $YourModel = new Another\Sublevel\Namespace\YourModel;
+ * |    $InstantiatedBootstrap = new core\Bootstrap\Bootstrap;
+ * |    $InstantiatedController = new core\Controller\Controller;
+ * |    $InstantiatedUser = new app\controllers\User\User;
+ * 
  * 
  * :pray:
  */
@@ -39,32 +40,32 @@ class Autoloader {
     // Hold the Filenames as array
     protected $baseDir = array();
     // Collect the Struktur of that app in an array , 
-    protected $strukture = array();
+    protected $structure = array();
     // Hold the Root-Dir
     protected $root = NULL;
 
     /** 
-     *  Set the Strukture
+     *  Set the structure
      * @Param:
-     *  | $dir_strukture: (string) Set the Struktur of the Folders in that App, for example: 'app/lib' 
-     * _@Return: (String) push in array $strukture
+     *  | $dir_structure: (string) Set the Struktur of the Folders in that App, for example: 'app/controllers' 
+     * _@Return: (void) push in array $structure
      * */
-    public function setStrukture($dir_strukture) {
+    public function setstructure($dir_structure) {
 
         // normalize that String
-        $dir_strukture = trim($dir_strukture, DIRECTORY_SEPARATOR);
+        $dir_structure = trim($dir_structure, DIRECTORY_SEPARATOR);
 
         // add this an $struktur, if value not exits
-        if(in_array($dir_strukture, $this->strukture) == false) {
-            array_push($this->strukture, $dir_strukture . DIRECTORY_SEPARATOR);
+        if(in_array($dir_structure, $this->structure) == false) {
+            array_push($this->structure, $dir_structure . DIRECTORY_SEPARATOR);
         } 
     }
 
     /** 
      *  Set the Root
      * @Param:
-     *  | $root: (string) Set the Root-Dir from that App
-     * _@Return: (String) push in Var $root
+     *  | $root: (string) Set the Root Directory from that App
+     * _@Return: (string) push in Var $root
      * */
     public function setRoot($root) {
 
@@ -81,41 +82,98 @@ class Autoloader {
     /** 
      *  Set the Class as array and collect the filename
      * @Param:
-     *  | $class: (string) The Class with Namespace, for example: 'Sublevel\Namespace\Class'
-     * _ @Return: (Bool) true, if that file added, false if the file in the given Struktur not exist
+     *  | $prefixNamespace: (string) The Namespace Prefix, for example: 'core\Controller'
+     *  | $class: (string) The NAme of Class, for example: 'Controller'
+     * _ @Return: (bool) true, if that file added, false if the file in the given Struktur not exists
      * */
-    public function setClass ($class) {
+    public function setClass ($prefixNamespace, $class) {
 
-        $class = trim($class, '\\');
+        // normalize Namespace and Prefix
+        $prefixNamespace = trim($prefixNamespace, '\\');
+        $class = trim($class);
 
-        // find path in stack ($strukture)
-        foreach ($this->strukture as $value) {
-            
-            // try to add the class as key and the filename to $baseDir
-            if(file_exists($this->root . $value . $this->splitClass($class) .'.php')) {
-                // create the key and the value
-                $this->baseDir[$class . '\\' . $this->splitClass($class)] = rtrim($this->root . $value);
-                
-                return true;
-            }  else {
-                // give up
-                return false;
-            }
-        }        
+        foreach ($this->structure as $key =>$value){
+            if(file_exists($this->root . $value . $class . '.php')) {
+                $this->baseDir[$prefixNamespace . '\\' . $class] = $value;
+            } 
+        }   
     }
     /**
      * Register the results
      * _ @Results: (void)
      */
-    
     public function register() {
         spl_autoload_register([$this, 'loadClass']);
     }
 
     /**
      * get the class from the namespace\Class
-     * | $class: (string) The Class with Namespace, for example: 'Sublevel\Namespace\Class'
-     * _ @Return: (string) The class, for eexample: 'Class'
+     * | $class: (string) The Class with Namespace, for example: 'core\Controller\Controller'
+     * _ @Return: (mixed) The File, false if that file not exists
+     */
+    protected function loadClass($class) {
+
+        // try to load a mapped file for the class
+        if ($this->loadMappedFileRegister($class)) {
+                
+            return $this->loadMappedFileRegister($class);
+        }
+        // never found a mapped file
+        return false;
+    }
+
+    /**
+     * Load the Mapped file for Register
+     * | $class: (string) The Class with Namespace, for example: 'core\Controller\Controller'
+     * _ @Return: (mixed) The File, false if that file not exists
+     */
+    protected function loadMappedFileRegister($class) {
+            
+            $file = $this->requireOnceFile($this->loadMappedFile($class));
+            if ($file){
+                // Yeah, we're Done so far
+                return $file;
+            } else {
+                // Houston, we have finally problem. it didn't work so far
+                return false;
+            }
+    }
+
+    /**
+     * Load the mapped file
+     * | $class: (string) The Class with Namespace, for example: 'core\Controller\Controller'
+     * _ @Return: (mixed)  The complete direcotry of that File, false if that file not exists
+     */
+    protected function loadMappedFile($class){
+
+        // looking for Key exist
+        if(array_key_exists($class, $this->baseDir)) {
+            foreach ($this->baseDir as $key => $value) {
+                if($key === $class) {
+                    // create the file from root direectory, base directory and the class with extension
+                    $file = $this->root
+                          .  $value
+                          . $this->splitClass($class)
+                          . '.php';                    
+                    // get the File
+                    if (file_exists($file)) {
+                        return $file;
+                    } else {
+                        
+                        return false;
+                    }
+                }
+            }
+        } else {
+            
+            return false;
+        }
+    }
+
+    /**
+     * get the class from the namespace\Class
+     * | $class: (string) The Class with Namespace, for example: 'core\Controller\Controller'
+     * _ @Return: (string) The class, for example: 'Controller'
      */
     protected function splitClass($class) {
 
@@ -132,58 +190,11 @@ class Autoloader {
     }
 
     /**
-     * get the class from the namespace\Class
-     * | $class: (string) The Class with Namespace, for example: 'Sublevel\Namespace\Class'
-     * _ @Return: (mixed) The class, for eexample: 'Class'
-     */
-    protected function loadClass($class) {
-
-        // try to load a mapped file for the class
-        if ($this->loadMappedFile($class)) {
-                
-            return $this->loadMappedFile($class);
-        }
-        // never found a mapped file
-        return false;
-    }
-
-    /**
-     * Load the mapped file
-     * | $class: (string) The Class with Namespace, for example: 'Sublevel\Namespace\Class'
-     * _ @Return: (mixed) The complete file, if not exist, false.
-     */
-    protected function loadMappedFile($class){
-        // check for existing base directory in the $baseDir
-        if (isset($this->baseDir[$class]) === false) {
-            return false;
-        } else {
-            // look through base directories for this namespace prefix
-            foreach ($this->baseDir as $key => $value) {
-                if($key === $class) {
-                    // create the file from base directory and the class with extension
-                    $file = $value
-                          . $this->splitClass($class)
-                          . '.php';
-                    
-                    // get the File
-                    if ($this->requireFile($file)) {
-                        // yeah, we're done
-                        return $file;
-                    } else {
-                        // Houston, we have problem. it didn't work
-                        return false;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Include mapped file
+     * Include mapped file as require Once
      * | $class: (string) The complete File
-     * _ @Return: (bool) true, when the file could be included, false, when taht was not possible.
+     * _ @Return: (bool) true, when the file could be included, false, when that was not possible.
      */
-    protected function requireFile($file) {
+    protected function requireOnceFile($file) {
         // try to include that file
         if (file_exists($file)) {
             require_once $file;
