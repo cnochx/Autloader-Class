@@ -1,2 +1,44 @@
-# Autloader-Class
-An Autoloder Class intended to be used as a default implementation for __autoload(), based on PSR-4 Autoloader Class
+# Autoloader-Class
+An Autoloder-Class intended to be used as a default implementation for __autoload().
+
+Highly inspired from the PSR-4 autoloader: https://www.php-fig.org/psr/psr-4 and the sample code: https://github.com/php-fig/fig-standards/blob/master/accepted/PSR-4-autoloader-examples.md.
+
+The Autoloader-Class is searching inside given Strukture and give back a `require_once('base/directory/of/that/File.php')`.
+
+## Integrate this autoloader with: 
+```php
+$Loading = new App\Autoloader\Autoloader;
+```
+
+## Add the Strukture of that App:
+```php
+$Loading->setStruktur(relative/path/to/folder);
+$Loading->setStruktur(relative/path/to/another/folder);
+```
+ 
+## Add the Root Directory of that App
+```php
+$Loading->setRoot(dirname(__FILE__));
+```
+ 
+## Set the Classes
+```php
+$Loading->setClass('Namespace\YourBootstrap');
+$Loading->setClass('Sublevel\Namespace\YourController');
+$Loading->setClass('Another\Sublevel\Namespace\YourModel');
+```
+
+## Register 
+ ```php
+$Loading->register()
+```
+
+## Call the Classes in your Awasome Code
+```php
+$YourBootstrap = new Namespace\YourBootstrap;
+$YourController = new Sublevel\Namespace\YourController;
+$YourModel = new Another\Sublevel\Namespace\YourModel;
+```
+
+
+:pray:
